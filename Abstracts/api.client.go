@@ -57,7 +57,6 @@ func (client *ApiClient) sendRequest(payload any, endpoint, token string, isRetr
 	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode == 401 && !isRetry {
-		// Clear token and retry once
 		client.TokenManager.ClearCache()
 		newToken, err := client.TokenManager.GetToken()
 		if err != nil {
@@ -76,6 +75,13 @@ func (client *ApiClient) sendRequest(payload any, endpoint, token string, isRetr
 		if val, ok := response["errorMessage"]; ok {
 			msg = fmt.Sprint(val)
 		}
+
+		// Handle "The transaction is being processed" specially (for STK Push Query)
+		if msg == "The transaction is being processed" {
+			// Return response without error to allow caller to handle this state
+			return response, nil
+		}
+
 		return nil, fmt.Errorf("API error (%d): %s", resp.StatusCode, msg)
 	}
 
