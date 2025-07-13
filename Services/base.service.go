@@ -31,7 +31,7 @@ func (b *BaseService) GenerateTimestamp() string {
 // GeneratePassword creates a base64-encoded password using business code, passkey, and timestamp
 func (b *BaseService) GeneratePassword() string {
 	timestamp := b.GenerateTimestamp()
-	plain := b.Config.BusinessCode + b.Config.PassKey + timestamp
+	plain := b.Config.GetBusinessCode() + b.Config.GetPassKey() + timestamp
 	return base64.StdEncoding.EncodeToString([]byte(plain))
 }
 

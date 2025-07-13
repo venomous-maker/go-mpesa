@@ -33,7 +33,7 @@ func (client *ApiClient) ExecuteRequest(payload any, endpoint string) (map[strin
 
 // sendRequest performs the actual HTTP request logic and retries if needed
 func (client *ApiClient) sendRequest(payload any, endpoint, token string, isRetry bool) (map[string]any, error) {
-	url := client.Config.BaseURL + endpoint
+	url := client.Config.GetBaseURL() + endpoint
 
 	data, err := json.Marshal(payload)
 	if err != nil {

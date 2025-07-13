@@ -34,9 +34,9 @@ type tokenResponse struct {
 // NewTokenManager initializes a token manager from config
 func NewTokenManager(cfg *MpesaConfig) *TokenManager {
 	return &TokenManager{
-		ConsumerKey:    cfg.ConsumerKey,
-		ConsumerSecret: cfg.ConsumerSecret,
-		BaseURL:        cfg.BaseURL,
+		ConsumerKey:    cfg.GetConsumerKey(),
+		ConsumerSecret: cfg.GetConsumerSecret(),
+		BaseURL:        cfg.GetBaseURL(),
 		TokenURL:       "/oauth/v1/generate?grant_type=client_credentials",
 		CachePath:      filepath.Join(os.TempDir(), "mpesa_api_token_cache.json"),
 	}

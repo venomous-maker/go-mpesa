@@ -71,7 +71,7 @@ func (s *StkService) SetTransactionDesc(desc string) *StkService {
 }
 
 func (s *StkService) validatePushParams() error {
-	if s.Config.BusinessCode == "" {
+	if s.Config.GetBusinessCode() == "" {
 		return errors.New("business code is required")
 	}
 	if s.transactionType == "" {
@@ -96,13 +96,13 @@ func (s *StkService) Push() (*StkService, error) {
 	}
 
 	data := map[string]any{
-		"BusinessShortCode": s.Config.BusinessCode,
+		"BusinessShortCode": s.Config.GetBusinessCode(),
 		"Password":          s.GeneratePassword(),
 		"Timestamp":         s.GenerateTimestamp(),
 		"TransactionType":   s.transactionType,
 		"Amount":            s.amount,
 		"PartyA":            s.phoneNumber,
-		"PartyB":            s.Config.BusinessCode,
+		"PartyB":            s.Config.GetBusinessCode(),
 		"PhoneNumber":       s.phoneNumber,
 		"CallBackURL":       s.callbackUrl,
 		"AccountReference":  s.accountReference,
@@ -159,7 +159,7 @@ func (s *StkService) Query(checkoutRequestId ...string) (map[string]any, error) 
 	}
 
 	data := map[string]any{
-		"BusinessShortCode": s.Config.BusinessCode,
+		"BusinessShortCode": s.Config.GetBusinessCode(),
 		"Password":          s.GeneratePassword(),
 		"Timestamp":         s.GenerateTimestamp(),
 		"CheckoutRequestID": reqID,
