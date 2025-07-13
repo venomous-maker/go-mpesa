@@ -3,12 +3,12 @@ package Abstracts
 import (
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 )
 
@@ -26,9 +26,10 @@ type tokenCache struct {
 	CreatedAt int64  `json:"created_at"`
 }
 
+// Changed ExpiresIn to string to match API response
 type tokenResponse struct {
 	AccessToken string `json:"access_token"`
-	ExpiresIn   int64  `json:"expires_in"`
+	ExpiresIn   string `json:"expires_in"`
 }
 
 // NewTokenManager initializes a token manager from config
@@ -86,6 +87,10 @@ func (tm *TokenManager) requestNewToken() (string, error) {
 	credentials := base64.StdEncoding.EncodeToString([]byte(tm.ConsumerKey + ":" + tm.ConsumerSecret))
 	req.Header.Set("Authorization", "Basic "+credentials)
 
+	fmt.Println("🔐 Requesting token...")
+	fmt.Println("🔗 URL:", url)
+	fmt.Println("🧾 Auth:", "Basic "+credentials)
+
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -94,20 +99,27 @@ func (tm *TokenManager) requestNewToken() (string, error) {
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
+	fmt.Printf("📦 Raw Token Response (%d): %s\n", resp.StatusCode, string(body))
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("non-200 response: %s", resp.Status)
+	}
+
 	var tokenResp tokenResponse
-	if err := json.Unmarshal(body, &tokenResp); err != nil || tokenResp.AccessToken == "" {
-		return "", errors.New("failed to get access token from M-Pesa API")
+	if err := json.Unmarshal(body, &tokenResp); err != nil {
+		return "", fmt.Errorf("token decode failed: %w - body: %s", err, string(body))
+	}
+	if tokenResp.AccessToken == "" {
+		return "", fmt.Errorf("no access token returned. Body: %s", string(body))
 	}
 
-	expiresIn := tokenResp.ExpiresIn
-	if expiresIn <= 0 {
-		expiresIn = 3600 // fallback
+	expiresInInt, err := strconv.ParseInt(tokenResp.ExpiresIn, 10, 64)
+	if err != nil {
+		return "", fmt.Errorf("invalid expires_in value: %w", err)
 	}
 
-	// Subtract buffer
-	expiresIn -= 60
-
-	// Cache the token
+	// Subtract buffer (60 seconds)
+	expiresIn := expiresInInt - 60
 	tm.cacheToken(tokenResp.AccessToken, time.Now().Unix()+expiresIn)
 
 	return tokenResp.AccessToken, nil
