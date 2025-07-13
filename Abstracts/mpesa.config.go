@@ -18,15 +18,15 @@ const (
 )
 
 type MpesaConfig struct {
-	ConsumerKey        string
-	ConsumerSecret     string
-	Environment        Environment
-	BaseURL            string
-	BusinessCode       string
-	PassKey            string
-	SecurityCredential string
-	QueueTimeoutURL    string
-	ResultURL          string
+	consumerKey        string
+	consumerSecret     string
+	environment        Environment
+	baseURL            string
+	businessCode       string
+	passKey            string
+	securityCredential string
+	queueTimeoutURL    string
+	resultURL          string
 }
 
 // NewMpesaConfig initializes the config with optional values.
@@ -42,23 +42,78 @@ func NewMpesaConfig(
 	}
 
 	cfg := &MpesaConfig{
-		ConsumerKey:        consumerKey,
-		ConsumerSecret:     consumerSecret,
-		Environment:        Environment(env),
-		BaseURL:            baseURL,
-		BusinessCode:       getOrDefault(businessCode, ""),
-		PassKey:            getOrDefault(passKey, ""),
-		SecurityCredential: getOrDefault(securityCredential, ""),
-		QueueTimeoutURL:    getOrDefault(queueTimeoutURL, ""),
-		ResultURL:          getOrDefault(resultURL, ""),
+		consumerKey:        consumerKey,
+		consumerSecret:     consumerSecret,
+		environment:        Environment(env),
+		baseURL:            baseURL,
+		businessCode:       getOrDefault(businessCode, ""),
+		passKey:            getOrDefault(passKey, ""),
+		securityCredential: getOrDefault(securityCredential, ""),
+		queueTimeoutURL:    getOrDefault(queueTimeoutURL, ""),
+		resultURL:          getOrDefault(resultURL, ""),
 	}
 
 	return cfg, nil
 }
 
+// Getters
+
+func (cfg *MpesaConfig) GetConsumerKey() string {
+	return cfg.consumerKey
+}
+
+func (cfg *MpesaConfig) GetConsumerSecret() string {
+	return cfg.consumerSecret
+}
+
+func (cfg *MpesaConfig) GetEnvironment() Environment {
+	return cfg.environment
+}
+
+func (cfg *MpesaConfig) GetBaseURL() string {
+	return cfg.baseURL
+}
+
+func (cfg *MpesaConfig) GetBusinessCode() string {
+	return cfg.businessCode
+}
+
+func (cfg *MpesaConfig) GetPassKey() string {
+	return cfg.passKey
+}
+
+func (cfg *MpesaConfig) GetSecurityCredential() string {
+	return cfg.securityCredential
+}
+
+func (cfg *MpesaConfig) GetQueueTimeoutURL() string {
+	return cfg.queueTimeoutURL
+}
+
+func (cfg *MpesaConfig) GetResultURL() string {
+	return cfg.resultURL
+}
+
+// Setters
+
+func (cfg *MpesaConfig) SetBusinessCode(code string) {
+	cfg.businessCode = code
+}
+
+func (cfg *MpesaConfig) SetPassKey(key string) {
+	cfg.passKey = key
+}
+
+func (cfg *MpesaConfig) SetQueueTimeoutURL(url string) {
+	cfg.queueTimeoutURL = url
+}
+
+func (cfg *MpesaConfig) SetResultURL(url string) {
+	cfg.resultURL = url
+}
+
 // SetSecurityCredential encrypts a password with AES-256-CBC and sets the security credential.
 func (cfg *MpesaConfig) SetSecurityCredential(initiatorPassword string) error {
-	// Dummy password and IV, you should replace with actual logic/certificate-based key
 	encryptionKey := []byte("mypasswordmypasswordmypassword12") // 32 bytes for AES-256
 	block, err := aes.NewCipher(encryptionKey)
 	if err != nil {
@@ -72,13 +127,12 @@ func (cfg *MpesaConfig) SetSecurityCredential(initiatorPassword string) error {
 
 	encrypter := cipher.NewCBCEncrypter(block, iv)
 
-	// Pad plaintext to block size
 	plaintext := pad([]byte(fmt.Sprintf("%s + Certificate", initiatorPassword)), aes.BlockSize)
 	ciphertext := make([]byte, len(plaintext))
 	encrypter.CryptBlocks(ciphertext, plaintext)
 
 	combined := append(iv, ciphertext...)
-	cfg.SecurityCredential = base64.StdEncoding.EncodeToString(combined)
+	cfg.securityCredential = base64.StdEncoding.EncodeToString(combined)
 
 	return nil
 }
