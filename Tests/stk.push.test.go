@@ -14,8 +14,8 @@ func main() {
 		"fEiZlnAbILFe9A0oKsODFEB8eAKRz9f4nb19YCGX8fsJbXgn",                 // consumer key
 		"PckiOm357DQ4A3XzcPUGhgOHkU1ar6AgBSyGtU1QDx91JaMP3CQJSeAwYvSUBydi", // consumer secret
 		Abstracts.Sandbox, // environment
-		ptr("4148097"),    // business short code
-		ptr("edad729a3b68c38fc282b2cdaa5196a3e0939d48c8cdc0f8a9a155bb750d8418"), // passkey
+		ptr("174379"),     // business short code
+		ptr("bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919"), // passkey
 		nil, nil, nil, // optional: securityCredential, queueTimeoutURL, resultURL
 	)
 	if err != nil {
