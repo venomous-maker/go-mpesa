@@ -12,27 +12,42 @@ import (
 	"time"
 )
 
+// TokenManager handles OAuth token acquisition and caching for M-Pesa API authentication.
+// It automatically manages token lifecycle, including caching valid tokens and refreshing expired ones.
 type TokenManager struct {
-	ConsumerKey    string
-	ConsumerSecret string
-	BaseURL        string
-	TokenURL       string
-	CachePath      string
+	ConsumerKey    string // Consumer key for OAuth authentication
+	ConsumerSecret string // Consumer secret for OAuth authentication
+	BaseURL        string // Base URL for M-Pesa API
+	TokenURL       string // OAuth token endpoint path
+	CachePath      string // File path for token cache storage
 }
 
+// tokenCache represents the structure for storing cached tokens.
 type tokenCache struct {
-	Token     string `json:"token"`
-	ExpiresAt int64  `json:"expires_at"`
-	CreatedAt int64  `json:"created_at"`
+	Token     string `json:"token"`      // The cached access token
+	ExpiresAt int64  `json:"expires_at"` // Unix timestamp when token expires
+	CreatedAt int64  `json:"created_at"` // Unix timestamp when token was created
 }
 
-// Changed ExpiresIn to string to match API response
+// tokenResponse represents the OAuth token response from M-Pesa API.
 type tokenResponse struct {
-	AccessToken string `json:"access_token"`
-	ExpiresIn   string `json:"expires_in"`
+	AccessToken string `json:"access_token"` // The access token from OAuth response
+	ExpiresIn   string `json:"expires_in"`   // Token expiration time in seconds (as string)
 }
 
-// NewTokenManager initializes a token manager from config
+// NewTokenManager creates a new token manager instance from the provided configuration.
+// The token manager handles OAuth authentication and token caching automatically.
+//
+// Parameters:
+//   - cfg: M-Pesa configuration containing consumer credentials and environment settings
+//
+// Returns:
+//   - *TokenManager: A configured token manager ready for token operations
+//
+// Example:
+//
+//	cfg := createMpesaConfig()
+//	tokenManager := NewTokenManager(cfg)
 func NewTokenManager(cfg *MpesaConfig) *TokenManager {
 	return &TokenManager{
 		ConsumerKey:    cfg.GetConsumerKey(),
@@ -43,7 +58,22 @@ func NewTokenManager(cfg *MpesaConfig) *TokenManager {
 	}
 }
 
-// GetToken returns a valid access token (cached or freshly requested)
+// GetToken returns a valid OAuth access token for API authentication.
+// This method first checks for a valid cached token and returns it if available.
+// If no valid cached token exists, it requests a new token from the M-Pesa OAuth endpoint.
+//
+// Returns:
+//   - string: A valid OAuth access token
+//   - error: An error if token acquisition fails
+//
+// Example:
+//
+//	token, err := tokenManager.GetToken()
+//	if err != nil {
+//	    log.Printf("Failed to get token: %v", err)
+//	    return
+//	}
+//	// Use token for API requests
 func (tm *TokenManager) GetToken() (string, error) {
 	if token := tm.getCachedToken(); token != "" {
 		return token, nil
