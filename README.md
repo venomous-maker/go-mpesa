@@ -5,6 +5,7 @@ A comprehensive Go SDK for integrating with Safaricom's M-Pesa API. This package
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://golang.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-Passing-green.svg)](Tests/)
+[![Documentation](https://img.shields.io/badge/Documentation-Complete-brightgreen.svg)](docs/)
 
 ## Features
 
@@ -18,6 +19,27 @@ A comprehensive Go SDK for integrating with Safaricom's M-Pesa API. This package
 - 🧪 **Sandbox & Production** - Support for both environments
 - ✅ **Comprehensive Testing** - Full test coverage with mocks
 - 📝 **Type Safety** - Fully typed API responses
+- 🔄 **Automatic Retries** - Built-in retry mechanism for failed requests
+- 📱 **Phone Number Validation** - Automatic phone number formatting
+- 🛡️ **Security** - Encrypted credentials and secure token handling
+
+## Table of Contents
+
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+- [Services](#services)
+  - [STK Push](#stk-push-lipa-na-m-pesa-online)
+  - [B2C Transactions](#b2c-business-to-customer)
+  - [C2B Transactions](#c2b-customer-to-business)
+  - [Account Balance](#account-balance)
+  - [Transaction Status](#transaction-status)
+  - [Transaction Reversal](#transaction-reversal)
+- [Error Handling](#error-handling)
+- [Testing](#testing)
+- [API Reference](#api-reference)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Installation
 
@@ -36,7 +58,6 @@ import (
     "fmt"
     "log"
     
-    "github.com/venomous-maker/go-mpesa/Abstracts"
     "github.com/venomous-maker/go-mpesa/Mpesa"
 )
 
@@ -51,54 +72,127 @@ func main() {
         log.Fatal(err)
     }
     
-    // Set your business shortcode
-    mpesa.SetBusinessCode("174379")
-    mpesa.SetPassKey("your_passkey")
+    // Your M-Pesa client is ready to use
+    fmt.Println("M-Pesa client initialized successfully")
 }
 ```
 
-### 2. STK Push (Lipa na M-Pesa Online)
+### 2. Simple STK Push Example
 
 ```go
-// Create STK service
-stkService := mpesa.STK()
+// Configure STK Push service
+stkService := mpesa.STKPush()
 
-// Configure the payment request
-stkService.
-    SetAmount(100).
-    SetTransactionType("CustomerPayBillOnline").
-    SetCallbackUrl("https://yourdomain.com/callback").
-    SetAccountReference("ORDER123").
-    SetTransactionDesc("Payment for Order #123")
+// Set transaction details
+response, err := stkService.
+    SetAmount("100").
+    SetPhoneNumber("254712345678").
+    SetAccountReference("ORDER001").
+    SetTransactionDesc("Payment for order").
+    SetCallbackURL("https://yourdomain.com/callback").
+    Send()
 
-// Set phone number (supports multiple formats)
-stkService, err = stkService.SetPhoneNumber("254711223344")
 if err != nil {
     log.Fatal(err)
 }
 
-// Initiate the STK push
-response, err := stkService.Push()
-if err != nil {
-    log.Fatal(err)
-}
-
-fmt.Println("STK Push initiated successfully!")
-
-// Get the checkout request ID for tracking
-checkoutID, err := stkService.GetCheckoutRequestID()
-if err != nil {
-    log.Fatal(err)
-}
-
-fmt.Printf("Checkout Request ID: %s\n", checkoutID)
+fmt.Printf("STK Push initiated: %+v\n", response)
 ```
 
-### 3. Query STK Push Status
+## Configuration
+
+### Basic Configuration
 
 ```go
-// Query the status of an STK push
-status, err := stkService.Query(checkoutID)
+mpesa, err := Mpesa.New(
+    "your_consumer_key",
+    "your_consumer_secret",
+    "sandbox", // Environment: "sandbox" or "production"
+)
+```
+
+### Advanced Configuration with Optional Parameters
+
+```go
+import "github.com/venomous-maker/go-mpesa/Abstracts"
+
+// Create configuration with optional parameters
+businessCode := "174379"
+passKey := "your_lipa_na_mpesa_passkey"
+securityCredential := "your_security_credential"
+queueTimeoutURL := "https://yourdomain.com/timeout"
+resultURL := "https://yourdomain.com/result"
+
+cfg, err := Abstracts.NewMpesaConfig(
+    "consumer_key",
+    "consumer_secret",
+    Abstracts.Sandbox,
+    &businessCode,
+    &passKey,
+    &securityCredential,
+    &queueTimeoutURL,
+    &resultURL,
+)
+
+if err != nil {
+    log.Fatal(err)
+}
+
+// Create M-Pesa client with custom config
+client := Abstracts.NewApiClient(cfg)
+mpesa := &Mpesa.Mpesa{
+    Config: cfg,
+    Client: client,
+}
+```
+
+## Services
+
+### STK Push (Lipa na M-Pesa Online)
+
+STK Push allows you to initiate M-Pesa payments directly from a customer's mobile phone.
+
+#### Basic STK Push
+
+```go
+stkService := mpesa.STKPush()
+
+response, err := stkService.
+    SetAmount("1000").
+    SetPhoneNumber("254712345678").
+    SetAccountReference("INV001").
+    SetTransactionDesc("Payment for invoice INV001").
+    SetCallbackURL("https://yourdomain.com/stk-callback").
+    Send()
+
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Checkout Request ID: %s\n", response["CheckoutRequestID"])
+fmt.Printf("Merchant Request ID: %s\n", response["MerchantRequestID"])
+```
+
+#### STK Push with Custom Transaction Type
+
+```go
+response, err := stkService.
+    SetTransactionType("CustomerBuyGoodsOnline").
+    SetAmount("500").
+    SetPhoneNumber("254712345678").
+    SetAccountReference("PROD123").
+    SetTransactionDesc("Purchase of Product 123").
+    SetCallbackURL("https://yourdomain.com/stk-callback").
+    Send()
+```
+
+#### Query STK Push Status
+
+```go
+checkoutRequestID := "ws_CO_123456789"
+merchantRequestID := "12345-67890-1"
+
+status, err := stkService.Query(checkoutRequestID, merchantRequestID)
 if err != nil {
     log.Fatal(err)
 }
@@ -106,138 +200,115 @@ if err != nil {
 fmt.Printf("Transaction Status: %+v\n", status)
 ```
 
-## Advanced Configuration
+### B2C (Business to Customer)
 
-### Custom Configuration
-
-```go
-import "github.com/venomous-maker/go-mpesa/Abstracts"
-
-// Create custom configuration
-cfg, err := Abstracts.NewMpesaConfig(
-    "consumer_key",
-    "consumer_secret",
-    Abstracts.Sandbox, // or Abstracts.Production
-    &businessCode,     // Business shortcode
-    &passKey,          // Lipa na M-Pesa passkey
-    &securityCredential, // For B2C, Reversal, etc.
-    &queueTimeoutURL,  // Queue timeout URL
-    &resultURL,        // Result URL
-)
-if err != nil {
-    log.Fatal(err)
-}
-
-// Create client with custom config
-client := Abstracts.NewApiClient(cfg)
-```
-
-### Environment Configuration
-
-```go
-// Sandbox environment (for testing)
-mpesa, err := Mpesa.New(consumerKey, consumerSecret, "sandbox")
-
-// Production environment
-mpesa, err := Mpesa.New(consumerKey, consumerSecret, "production")
-```
-
-## Services
-
-### STK Push Service
-
-STK Push allows you to initiate M-Pesa payments from a customer's phone.
-
-```go
-stkService := mpesa.STK()
-
-// Method chaining for clean configuration
-response, err := stkService.
-    SetAmount(1000).
-    SetTransactionType("CustomerPayBillOnline").
-    SetPhoneNumber("254711223344").
-    SetCallbackUrl("https://yourdomain.com/callback").
-    SetAccountReference("INV123").
-    SetTransactionDesc("Invoice payment").
-    Push()
-```
-
-**Supported Amount Types:**
-- `int`: `SetAmount(100)`
-- `string`: `SetAmount("100")`
-- `int64`: `SetAmount(int64(100))`
-- `float`: `SetAmount(99.99)`
-
-**Phone Number Formats:**
-- `254711223344` (with country code)
-- `0711223344` (without country code)
-- `+254711223344` (international format)
-
-### B2C Service
-
-Send money from business to customer.
+Send money from your business account to customer accounts.
 
 ```go
 b2cService := mpesa.B2C()
 
 response, err := b2cService.
-    SetAmount(1000).
-    SetPhoneNumber("254711223344").
-    SetCommandID("BusinessPayment").
+    SetAmount("1000").
+    SetPhoneNumber("254712345678").
     SetRemarks("Salary payment").
     SetOccasion("Monthly salary").
+    SetCommandID("BusinessPayment"). // or "SalaryPayment", "PromotionPayment"
     Send()
+
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("B2C Transaction ID: %s\n", response["ConversationID"])
 ```
 
-### C2B Service
+#### Available B2C Command IDs
 
-Register URLs and simulate C2B transactions.
+- `BusinessPayment` - General business payments
+- `SalaryPayment` - Salary payments to employees
+- `PromotionPayment` - Promotional payments and rewards
+
+### C2B (Customer to Business)
+
+Register URLs and simulate customer payments to your business.
+
+#### Register C2B URLs
 
 ```go
 c2bService := mpesa.C2B()
 
-// Register URLs
-err := c2bService.
-    SetValidationURL("https://yourdomain.com/validation").
-    SetConfirmationURL("https://yourdomain.com/confirmation").
+response, err := c2bService.
+    SetValidationURL("https://yourdomain.com/c2b-validation").
+    SetConfirmationURL("https://yourdomain.com/c2b-confirmation").
     RegisterURLs()
 
-// Simulate payment
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("URLs registered: %+v\n", response)
+```
+
+#### Simulate C2B Transaction (Sandbox Only)
+
+```go
 response, err := c2bService.
-    SetAmount(1000).
-    SetPhoneNumber("254711223344").
-    SetBillRefNumber("REF123").
+    SetAmount("1000").
+    SetPhoneNumber("254712345678").
+    SetBillRefNumber("INV001").
+    SetCommandID("CustomerPayBillOnline"). // or "CustomerBuyGoodsOnline"
     Simulate()
+
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("C2B Simulation: %+v\n", response)
 ```
 
 ### Account Balance
 
-Check your M-Pesa account balance.
+Query your M-Pesa account balance.
 
 ```go
 balanceService := mpesa.AccountBalance()
 
-balance, err := balanceService.
-    SetCommandID("AccountBalance").
-    SetRemarks("Balance inquiry").
+response, err := balanceService.
+    SetRemarks("Account balance inquiry").
+    SetQueueTimeoutURL("https://yourdomain.com/timeout").
+    SetResultURL("https://yourdomain.com/balance-result").
     Query()
+
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Balance Query ID: %s\n", response["ConversationID"])
 ```
 
 ### Transaction Status
 
-Query the status of any M-Pesa transaction.
+Check the status of any M-Pesa transaction.
 
 ```go
 statusService := mpesa.TransactionStatus()
 
-status, err := statusService.
-    SetTransactionID("ABC123XYZ").
-    SetCommandID("TransactionStatusQuery").
-    SetRemarks("Status check").
+response, err := statusService.
+    SetTransactionID("LHG31AA5TX").
+    SetRemarks("Transaction status inquiry").
+    SetOccasion("Status check").
+    SetQueueTimeoutURL("https://yourdomain.com/timeout").
+    SetResultURL("https://yourdomain.com/status-result").
     Query()
+
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Status Query ID: %s\n", response["ConversationID"])
 ```
 
-### Reversal
+### Transaction Reversal
 
 Reverse a completed M-Pesa transaction.
 
@@ -245,40 +316,59 @@ Reverse a completed M-Pesa transaction.
 reversalService := mpesa.Reversal()
 
 response, err := reversalService.
-    SetTransactionID("ABC123XYZ").
-    SetAmount(1000).
-    SetCommandID("TransactionReversal").
-    SetRemarks("Refund processing").
-    SetOccasion("Customer refund").
+    SetTransactionID("LHG31AA5TX").
+    SetAmount("1000").
+    SetRemarks("Reversal for duplicate payment").
+    SetOccasion("Duplicate transaction").
+    SetQueueTimeoutURL("https://yourdomain.com/timeout").
+    SetResultURL("https://yourdomain.com/reversal-result").
     Reverse()
+
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Reversal ID: %s\n", response["ConversationID"])
 ```
 
 ## Error Handling
 
-The SDK provides detailed error messages for common issues:
+The SDK provides comprehensive error handling with detailed error messages.
 
 ```go
-stkService := mpesa.STK()
+response, err := stkService.
+    SetAmount("100").
+    SetPhoneNumber("254712345678").
+    Send()
 
-// This will return a validation error
-_, err := stkService.Push()
 if err != nil {
+    // Handle different types of errors
     switch {
-    case strings.Contains(err.Error(), "amount is required"):
-        fmt.Println("Please set the amount")
-    case strings.Contains(err.Error(), "phone number is required"):
-        fmt.Println("Please set the phone number")
-    case strings.Contains(err.Error(), "callback URL is required"):
-        fmt.Println("Please set the callback URL")
+    case strings.Contains(err.Error(), "authentication"):
+        log.Println("Authentication failed - check credentials")
+    case strings.Contains(err.Error(), "insufficient funds"):
+        log.Println("Insufficient funds in account")
+    case strings.Contains(err.Error(), "invalid phone"):
+        log.Println("Invalid phone number format")
     default:
-        fmt.Printf("Error: %v\n", err)
+        log.Printf("Transaction failed: %v", err)
+    }
+    return
+}
+
+// Check response for transaction status
+if responseCode, ok := response["ResponseCode"].(string); ok {
+    if responseCode == "0" {
+        log.Println("Transaction initiated successfully")
+    } else {
+        log.Printf("Transaction failed with code: %s", responseCode)
     }
 }
 ```
 
 ## Testing
 
-The package includes comprehensive tests with mocking support.
+The SDK includes comprehensive tests with mocks for all services.
 
 ### Running Tests
 
@@ -289,252 +379,265 @@ go test ./...
 # Run tests with coverage
 go test -cover ./...
 
-# Run specific test package
-go test ./Tests
-
-# Run with verbose output
-go test -v ./Tests
+# Run specific test
+go test -run TestSTKPush ./Tests/
 ```
 
-### Writing Tests
-
-The package provides mock interfaces for testing:
+### Example Test
 
 ```go
-import (
-    "testing"
-    "github.com/stretchr/testify/assert"
-    "github.com/stretchr/testify/mock"
-)
-
 func TestSTKPush(t *testing.T) {
     // Create mock client
-    mockClient := &MockMpesaInterface{}
+    mockClient := &MockMpesaClient{}
     
-    // Setup expected response
+    // Set up expected response
     expectedResponse := map[string]any{
-        "CheckoutRequestID": "ws_CO_12345678",
-        "ResponseCode": "0",
+        "CheckoutRequestID": "ws_CO_123456789",
+        "ResponseCode":      "0",
+        "ResponseDescription": "Success",
     }
     
-    mockClient.On("ExecuteRequest", mock.Anything, mock.Anything).
-        Return(expectedResponse, nil)
+    mockClient.On("Post", mock.Anything, mock.Anything).Return(expectedResponse, nil)
     
-    // Test your service
+    // Create service with mock
     cfg := createTestConfig()
-    service := Services.NewStkService(cfg, mockClient)
+    stkService := NewStkService(cfg, mockClient)
     
-    // Configure and test
-    service.SetAmount(100)
-    // ... configure other fields
+    // Execute test
+    response, err := stkService.
+        SetAmount("100").
+        SetPhoneNumber("254712345678").
+        Send()
     
-    response, err := service.Push()
+    // Assertions
     assert.NoError(t, err)
-    assert.NotNil(t, response)
+    assert.Equal(t, "ws_CO_123456789", response["CheckoutRequestID"])
 }
 ```
 
-## Callback Handling
+## Webhook Handling
+
+Handle M-Pesa callbacks in your application:
 
 ### STK Push Callback
 
-Handle STK Push callbacks in your application:
-
 ```go
-type STKCallback struct {
-    Body struct {
-        StkCallback struct {
-            MerchantRequestID   string `json:"MerchantRequestID"`
-            CheckoutRequestID   string `json:"CheckoutRequestID"`
-            ResultCode          int    `json:"ResultCode"`
-            ResultDesc          string `json:"ResultDesc"`
-            CallbackMetadata    struct {
-                Item []struct {
-                    Name  string      `json:"Name"`
-                    Value interface{} `json:"Value"`
-                } `json:"Item"`
-            } `json:"CallbackMetadata,omitempty"`
-        } `json:"stkCallback"`
-    } `json:"Body"`
-}
-
 func handleSTKCallback(w http.ResponseWriter, r *http.Request) {
-    var callback STKCallback
+    var callback STKCallbackResponse
     
     if err := json.NewDecoder(r.Body).Decode(&callback); err != nil {
         http.Error(w, "Invalid JSON", http.StatusBadRequest)
         return
     }
     
-    stkCallback := callback.Body.StkCallback
-    
-    if stkCallback.ResultCode == 0 {
+    // Process the callback
+    if callback.Body.StkCallback.ResultCode == 0 {
         // Payment successful
-        fmt.Printf("Payment successful: %s\n", stkCallback.CheckoutRequestID)
-        
-        // Extract payment details from CallbackMetadata
-        for _, item := range stkCallback.CallbackMetadata.Item {
-            switch item.Name {
-            case "Amount":
-                fmt.Printf("Amount: %v\n", item.Value)
-            case "MpesaReceiptNumber":
-                fmt.Printf("Receipt: %v\n", item.Value)
-            case "PhoneNumber":
-                fmt.Printf("Phone: %v\n", item.Value)
-            }
-        }
+        log.Printf("Payment successful: %s", 
+            callback.Body.StkCallback.CheckoutRequestID)
     } else {
         // Payment failed
-        fmt.Printf("Payment failed: %s\n", stkCallback.ResultDesc)
+        log.Printf("Payment failed: %s", 
+            callback.Body.StkCallback.ResultDesc)
+    }
+    
+    // Send response
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+}
+```
+
+### B2C Result Callback
+
+```go
+func handleB2CResult(w http.ResponseWriter, r *http.Request) {
+    var result B2CResultResponse
+    
+    if err := json.NewDecoder(r.Body).Decode(&result); err != nil {
+        http.Error(w, "Invalid JSON", http.StatusBadRequest)
+        return
+    }
+    
+    // Process the result
+    if result.Result.ResultCode == 0 {
+        // Transaction successful
+        log.Printf("B2C successful: %s", result.Result.ConversationID)
+    } else {
+        // Transaction failed
+        log.Printf("B2C failed: %s", result.Result.ResultDesc)
     }
     
     w.WriteHeader(http.StatusOK)
 }
 ```
 
-## Configuration Reference
+## Best Practices
 
-### Environment Variables
-
-You can use environment variables for configuration:
-
-```bash
-export MPESA_CONSUMER_KEY="your_consumer_key"
-export MPESA_CONSUMER_SECRET="your_consumer_secret"
-export MPESA_ENVIRONMENT="sandbox"
-export MPESA_BUSINESS_CODE="174379"
-export MPESA_PASSKEY="your_passkey"
-```
+### 1. Environment Management
 
 ```go
+// Use environment variables for credentials
 import "os"
 
-mpesa, err := Mpesa.New(
-    os.Getenv("MPESA_CONSUMER_KEY"),
-    os.Getenv("MPESA_CONSUMER_SECRET"),
-    os.Getenv("MPESA_ENVIRONMENT"),
+consumerKey := os.Getenv("MPESA_CONSUMER_KEY")
+consumerSecret := os.Getenv("MPESA_CONSUMER_SECRET")
+environment := os.Getenv("MPESA_ENVIRONMENT") // "sandbox" or "production"
+
+mpesa, err := Mpesa.New(consumerKey, consumerSecret, environment)
+```
+
+### 2. Phone Number Formatting
+
+```go
+// The SDK automatically formats phone numbers, but ensure they start with 254
+phoneNumber := "0712345678"   // Will be converted to 254712345678
+phoneNumber := "712345678"    // Will be converted to 254712345678
+phoneNumber := "254712345678" // Already in correct format
+```
+
+### 3. Callback URL Security
+
+```go
+// Always use HTTPS for callback URLs
+callbackURL := "https://yourdomain.com/mpesa-callback"
+
+// Implement signature verification for callbacks
+func verifyCallback(r *http.Request) bool {
+    // Implement signature verification logic
+    return true
+}
+```
+
+### 4. Error Logging
+
+```go
+import "github.com/sirupsen/logrus"
+
+logger := logrus.New()
+
+response, err := stkService.Send()
+if err != nil {
+    logger.WithFields(logrus.Fields{
+        "service": "STK Push",
+        "error":   err.Error(),
+        "amount":  stkService.amount,
+        "phone":   stkService.phoneNumber,
+    }).Error("Transaction failed")
+}
+```
+
+## API Reference
+
+### Core Types
+
+```go
+// Environment constants
+const (
+    Sandbox    Environment = "sandbox"
+    Production Environment = "production"
 )
-```
 
-### API Endpoints
+// Common response fields
+type MpesaResponse struct {
+    ResponseCode        string `json:"ResponseCode"`
+    ResponseDescription string `json:"ResponseDescription"`
+    ConversationID      string `json:"ConversationID"`
+    OriginatorConversationID string `json:"OriginatorConversationID"`
+}
 
-The SDK automatically handles API endpoints based on environment:
-
-**Sandbox:**
-- Base URL: `https://sandbox.safaricom.co.ke`
-
-**Production:**
-- Base URL: `https://api.safaricom.co.ke`
-
-## Common Use Cases
-
-### E-commerce Checkout
-
-```go
-func processPayment(orderID string, amount int, phoneNumber string) error {
-    mpesa, err := Mpesa.New(consumerKey, consumerSecret, "production")
-    if err != nil {
-        return err
-    }
-    
-    mpesa.SetBusinessCode(businessCode)
-    mpesa.SetPassKey(passKey)
-    
-    stkService := mpesa.STK()
-    
-    _, err = stkService.
-        SetAmount(amount).
-        SetTransactionType("CustomerPayBillOnline").
-        SetPhoneNumber(phoneNumber).
-        SetCallbackUrl("https://yoursite.com/mpesa/callback").
-        SetAccountReference(orderID).
-        SetTransactionDesc(fmt.Sprintf("Payment for order %s", orderID)).
-        Push()
-    
-    return err
+// STK Push specific response
+type STKResponse struct {
+    MerchantRequestID   string `json:"MerchantRequestID"`
+    CheckoutRequestID   string `json:"CheckoutRequestID"`
+    ResponseCode        string `json:"ResponseCode"`
+    ResponseDescription string `json:"ResponseDescription"`
+    CustomerMessage     string `json:"CustomerMessage"`
 }
 ```
 
-### Salary Payments
+### Service Methods
 
-```go
-func paySalary(employeePhone string, amount int) error {
-    mpesa, err := Mpesa.New(consumerKey, consumerSecret, "production")
-    if err != nil {
-        return err
-    }
-    
-    b2cService := mpesa.B2C()
-    
-    _, err = b2cService.
-        SetAmount(amount).
-        SetPhoneNumber(employeePhone).
-        SetCommandID("SalaryPayment").
-        SetRemarks("Monthly salary payment").
-        SetOccasion("Salary").
-        Send()
-    
-    return err
-}
-```
+#### STK Service
+- `SetAmount(amount string) *StkService`
+- `SetPhoneNumber(phone string) *StkService`
+- `SetAccountReference(ref string) *StkService`
+- `SetTransactionDesc(desc string) *StkService`
+- `SetCallbackURL(url string) *StkService`
+- `SetTransactionType(txType string) *StkService`
+- `Send() (map[string]any, error)`
+- `Query(checkoutRequestID, merchantRequestID string) (map[string]any, error)`
+
+#### B2C Service
+- `SetAmount(amount string) *B2CService`
+- `SetPhoneNumber(phone string) *B2CService`
+- `SetRemarks(remarks string) *B2CService`
+- `SetOccasion(occasion string) *B2CService`
+- `SetCommandID(commandID string) *B2CService`
+- `Send() (map[string]any, error)`
+
+#### Account Balance Service
+- `SetRemarks(remarks string) *AccountBalanceService`
+- `SetQueueTimeoutURL(url string) *AccountBalanceService`
+- `SetResultURL(url string) *AccountBalanceService`
+- `Query() (map[string]any, error)`
+
+For complete API documentation, see the [API Documentation](docs/api.md).
+
+## Examples
+
+Check out the [examples directory](examples/) for complete working examples:
+
+- [Basic STK Push](examples/stk-push/main.go)
+- [B2C Payment](examples/b2c/main.go)
+- [Web Application Integration](examples/webapp/main.go)
+- [Webhook Handling](examples/webhooks/main.go)
 
 ## Contributing
 
-We welcome contributions! Please follow these steps:
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/new-feature`
-3. Make your changes and add tests
-4. Ensure tests pass: `go test ./...`
-5. Commit your changes: `git commit -m "Add new feature"`
-6. Push to the branch: `git push origin feature/new-feature`
-7. Submit a pull request
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
 
 ### Development Setup
 
-```bash
-# Clone the repository
-git clone https://github.com/venomous-maker/go-mpesa.git
-cd go-mpesa
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/venomous-maker/go-mpesa.git
+   cd go-mpesa
+   ```
 
-# Install dependencies
-go mod tidy
+2. Install dependencies:
+   ```bash
+   go mod download
+   ```
 
-# Run tests
-go test ./...
+3. Run tests:
+   ```bash
+   go test ./...
+   ```
 
-# Run tests with coverage
-go test -cover ./...
-```
+4. Create a feature branch:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a list of changes and version history.
+
+## Support
+
+- 📧 Email: support@venomous-maker.com
+- 🐛 Issues: [GitHub Issues](https://github.com/venomous-maker/go-mpesa/issues)
+- 💬 Discussions: [GitHub Discussions](https://github.com/venomous-maker/go-mpesa/discussions)
+- 📖 Documentation: [docs/](docs/)
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Support
+## Disclaimer
 
-- 📧 **Email**: support@example.com
-- 🐛 **Issues**: [GitHub Issues](https://github.com/venomous-maker/go-mpesa/issues)
-- 📖 **Documentation**: [API Documentation](https://developer.safaricom.co.ke/)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/venomous-maker/go-mpesa/discussions)
-
-## Changelog
-
-### v1.0.1
-- Initial release
-- STK Push implementation
-- B2C, C2B services
-- Account Balance and Transaction Status
-- Reversal service
-- Comprehensive testing
-- Full documentation
-
-## Acknowledgments
-
-- [Safaricom](https://safaricom.co.ke) for providing the M-Pesa API
-- [Go](https://golang.org) team for the excellent programming language
-- All contributors who help improve this package
+This SDK is not officially affiliated with Safaricom. M-Pesa is a trademark of Safaricom Limited. Use this SDK in accordance with Safaricom's terms of service and your agreement with them.
 
 ---
 
-**Disclaimer**: This is an unofficial SDK. Please refer to the official Safaricom M-Pesa API documentation for the most up-to-date information.
+**Made with ❤️ by [Venomous Maker](https://github.com/venomous-maker)**
