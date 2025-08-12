@@ -7,10 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Planned
+- Advanced retry mechanisms with exponential backoff
+- Request/response logging middleware
+- Performance optimizations
+- Additional webhook signature verification
+
+## [1.0.1] - 2024-08-12
+
 ### Added
-- Initial release of Go M-Pesa SDK
+- Comprehensive documentation suite with API reference
+- Complete examples directory with practical implementations
+- STK Push example with web server and callback handling
+- B2C payment example with result and timeout callbacks
+- Contributing guidelines with development setup instructions
+- MIT License for open source distribution
+- Professional README with table of contents and badges
+- API documentation with complete method signatures
+- Environment configuration templates (.env.example files)
+- Webhook handling patterns and best practices
+- Error handling examples and troubleshooting guides
+
+### Enhanced
+- README.md with comprehensive service documentation
+- Code examples for all M-Pesa services (STK Push, B2C, C2B, Account Balance, Transaction Status, Reversal)
+- Documentation structure with docs/ directory
+- Project organization with examples/ directory
+
+### Documentation
+- Added complete API reference documentation
+- Created practical examples for real-world usage
+- Added contributing guidelines for open source contributions
+- Enhanced code comments and docstrings throughout the codebase
+- Added changelog for version tracking
+
+## [1.0.0] - 2024-08-12
+
+### Added
+- Initial release of the Go M-Pesa SDK
 - STK Push (Lipa na M-Pesa Online) service
-- B2C (Business to Customer) service
+- B2C (Business to Customer) service  
 - C2B (Customer to Business) service
 - Account Balance service
 - Transaction Status service
@@ -22,30 +58,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Detailed error handling
 - Type-safe API responses
 
-### Changed
-- N/A (Initial release)
-
-### Deprecated
-- N/A (Initial release)
-
-### Removed
-- N/A (Initial release)
-
-### Fixed
-- N/A (Initial release)
-
 ### Security
 - Encrypted credential handling
 - Secure token storage and refresh
 - HTTPS-only communication
-
-## [1.0.0] - 2024-08-12
-
-### Added
-- Initial release of the Go M-Pesa SDK
-- Complete M-Pesa API integration
-- Full documentation and examples
-- Comprehensive test coverage
 
 ---
 
@@ -62,6 +78,9 @@ When making a new release, copy this template:
 ### Changed
 - Changes in existing functionality
 
+### Enhanced
+- Improvements to existing features
+
 ### Deprecated
 - Soon-to-be removed features
 
@@ -73,6 +92,9 @@ When making a new release, copy this template:
 
 ### Security
 - Security improvements
+
+### Documentation
+- Documentation updates
 ```
 
 ## Versioning Guidelines
