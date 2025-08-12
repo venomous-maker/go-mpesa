@@ -520,7 +520,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Changelog
 
-### v1.0.0
+### v1.0.1
 - Initial release
 - STK Push implementation
 - B2C, C2B services
