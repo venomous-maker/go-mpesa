@@ -242,3 +242,30 @@ func (m *Mpesa) Reversal() *Services.ReversalService {
 func (m *Mpesa) B2PayBill() *Services.BusinessToPayBillService {
 	return Services.NewBusinessToPayBillService(m.Config, m.Client)
 }
+
+// B2BuyGoods creates and returns a new Business-to-Buy-Goods service instance.
+// This service allows a business to pay merchants (till, store, HO) on behalf of a consumer.
+//
+// Returns:
+//   - *Services.BusinessBuyGoodsService: A configured service for B2B BuyGoods payments
+//
+// Example:
+//
+//	b2buygoodsService := mpesa.B2BuyGoods()
+//	response, err := b2buygoodsService.
+//	    SetInitiator("testapi").
+//	    SetSecurityCredential("your_security_credential").
+//	    SetAmount(1000).
+//	    SetPartyA("174379").
+//	    SetPartyB("123456").
+//	    SetAccountReference("ABC123").
+//	    SetRequester("254711223344").
+//	    SetRemarks("Payment for goods").
+//	    SetOccasion("Payment").
+//	    SetQueueTimeoutURL("https://example.com/timeout").
+//	    SetResultURL("https://example.com/result").
+//	    Send()
+
+func (m *Mpesa) B2BuyGoods() *Services.BusinessBuyGoodsService {
+	return Services.NewBusinessBuyGoodsService(m.Config, m.Client)
+}
