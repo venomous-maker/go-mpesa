@@ -35,6 +35,7 @@ A comprehensive Go SDK for integrating with Safaricom's M-Pesa API. This package
   - [Account Balance](#account-balance)
   - [Transaction Status](#transaction-status)
   - [Transaction Reversal](#transaction-reversal)
+  - [B2B Transactions](#b2b-business-paybill--business-buy-goods)
 - [Error Handling](#error-handling)
 - [Testing](#testing)
 - [API Reference](#api-reference)
@@ -331,6 +332,87 @@ if err != nil {
 fmt.Printf("Reversal ID: %s\n", response["ConversationID"])
 ```
 
+### B2B (Business PayBill & Business Buy Goods)
+
+The SDK provides first-class support for M-Pesa B2B operations: BusinessPayBill (pay a paybill/store) and BusinessBuyGoods (pay a till/store/merchant HO).
+
+Key features:
+- BusinessPayBill and BusinessBuyGoods service implementations (convenience wrappers).
+- Shared helper for generic B2B requests: ExecuteB2BRequest (builds payload and calls /mpesa/b2b/v1/paymentrequest).
+- Generic callback parser: ParseB2BCallback — normalizes ResultParameters and ReferenceData and exposes Success, ResultCode, TransactionID, and other fields.
+- Webhook handler: B2PayBillCallbackHandler (reads JSON, calls ParseB2BCallback and returns a simplified JSON response).
+
+#### Example: Using BusinessBuyGoods service
+
+```go
+// create config and client
+cfg, _ := Abstracts.NewMpesaConfig(...)
+client := Abstracts.NewApiClient(cfg)
+
+buy := Services.NewBusinessBuyGoodsService(cfg, client)
+buy.SetInitiator("API_Username")
+_ = buy.SetSecurityCredential("plain_password")
+
+buy.SetAmount(500)
+buy.SetPartyA("123456") // your shortcode
+buy.SetPartyB("600000") // merchant till
+buy.SetAccountReference("INV-1001")
+buy.SetRemarks("Payment for goods")
+
+resp, err := buy.Send()
+if err != nil {
+    // handle error
+}
+fmt.Printf("B2B request response: %+v", resp)
+```
+
+#### Example: Using the shared helper directly
+
+```go
+req := Services.B2BRequest{
+    Initiator: "API_Username",
+    SecurityCredential: "<encrypted>",
+    CommandID: "BusinessBuyGoods",
+    Amount: 500,
+    PartyA: "123456",
+    PartyB: "600000",
+    AccountReference: "INV-1001",
+    ResultURL: "https://your.domain/b2b/result",
+    QueueTimeOutURL: "https://your.domain/b2b/timeout",
+}
+
+resp, err := Services.ExecuteB2BRequest(cfg, client, req)
+// handle resp / err
+```
+
+#### Parsing callbacks and webhook
+
+When M-Pesa posts results to your ResultURL, you can parse the callback using ParseB2BCallback to get normalized fields:
+
+```go
+var payload map[string]any
+json.NewDecoder(req.Body).Decode(&payload)
+
+parsed, err := Services.ParseB2BCallback(payload)
+if err != nil { /* handle */ }
+if parsed.Success {
+    // success handling: parsed.TransactionID, parsed.ResultParameters["Amount"], etc.
+} else {
+    // failure handling: parsed.ResultCode, parsed.ResultDesc
+}
+```
+
+You can also register the provided HTTP handler which wraps the parser:
+
+```go
+svc := Services.NewBusinessToPayBillService(cfg, client) // service instance used only for handler convenience
+http.HandleFunc("/webhook/b2b", Services.B2PayBillCallbackHandler(svc))
+```
+
+Notes
+- Ensure ResultURL and QueueTimeOutURL are reachable and use HTTPS in production.
+- Validate and persist callback payloads for auditing.
+
 ## Error Handling
 
 The SDK provides comprehensive error handling with detailed error messages.
@@ -471,6 +553,30 @@ func handleB2CResult(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
+### B2B Result Callback
+
+```go
+func handleB2BResult(w http.ResponseWriter, r *http.Request) {
+    var result B2BResultResponse
+    
+    if err := json.NewDecoder(r.Body).Decode(&result); err != nil {
+        http.Error(w, "Invalid JSON", http.StatusBadRequest)
+        return
+    }
+    
+    // Process the result
+    if result.Result.ResultCode == 0 {
+        // Transaction successful
+        log.Printf("B2B successful: %s", result.Result.ConversationID)
+    } else {
+        // Transaction failed
+        log.Printf("B2B failed: %s", result.Result.ResultDesc)
+    }
+    
+    w.WriteHeader(http.StatusOK)
+}
+```
+
 ## Best Practices
 
 ### 1. Environment Management
@@ -580,6 +686,15 @@ type STKResponse struct {
 - `SetQueueTimeoutURL(url string) *AccountBalanceService`
 - `SetResultURL(url string) *AccountBalanceService`
 - `Query() (map[string]any, error)`
+
+#### B2B Service
+- `SetAmount(amount string) *B2BService`
+- `SetPartyA(partyA string) *B2BService`
+- `SetPartyB(partyB string) *B2BService`
+- `SetAccountReference(ref string) *B2BService`
+- `SetRemarks(remarks string) *B2BService`
+- `SetCommandID(commandID string) *B2BService`
+- `Send() (map[string]any, error)`
 
 For complete API documentation, see the [API Documentation](docs/api.md).
 
