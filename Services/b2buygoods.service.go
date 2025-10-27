@@ -2,7 +2,6 @@ package Services
 
 import (
 	"errors"
-	"math"
 
 	abstracts "github.com/venomous-maker/go-mpesa/Abstracts"
 )
@@ -103,9 +102,8 @@ func (s *BusinessBuyGoodsService) SetResultURL(url string) *BusinessBuyGoodsServ
 	return s
 }
 
-// Send constructs and sends the BusinessBuyGoods payment request to M-Pesa.
+// Send constructs and sends the BusinessBuyGoods payment request to M-Pesa using shared helper.
 func (s *BusinessBuyGoodsService) Send() (map[string]any, error) {
-	// Validate required fields
 	if s.initiator == "" {
 		return nil, errors.New("initiator is required")
 	}
@@ -122,30 +120,35 @@ func (s *BusinessBuyGoodsService) Send() (map[string]any, error) {
 		return nil, errors.New("partyB (destination shortcode/merchant) is required")
 	}
 
-	data := map[string]any{
-		"Initiator":              s.initiator,
-		"SecurityCredential":     s.Config.GetSecurityCredential(),
-		"CommandID":              s.commandID,
-		"SenderIdentifierType":   s.senderIdentifierType,
-		"RecieverIdentifierType": s.recipientIdentifierType,
-		"Amount":                 math.Round(s.amount),
-		"PartyA":                 s.getPartyA(),
-		"PartyB":                 s.partyB,
-		"AccountReference":       s.accountReference,
-		"Requester":              s.requester,
-		"Remarks":                s.remarks,
-		"QueueTimeOutURL":        s.Config.GetQueueTimeoutURL(),
-		"ResultURL":              s.Config.GetResultURL(),
-		"Occasion":               s.occasion,
+	req := B2BRequest{
+		Initiator:              s.initiator,
+		SecurityCredential:     s.Config.GetSecurityCredential(),
+		CommandID:              s.commandID,
+		SenderIdentifierType:   s.senderIdentifierType,
+		RecieverIdentifierType: s.recipientIdentifierType,
+		Amount:                 s.amount,
+		PartyA:                 s.getPartyA(),
+		PartyB:                 s.partyB,
+		AccountReference:       s.accountReference,
+		Requester:              s.requester,
+		Remarks:                s.remarks,
+		QueueTimeOutURL:        s.Config.GetQueueTimeoutURL(),
+		ResultURL:              s.Config.GetResultURL(),
+		Occasion:               s.occasion,
 	}
 
-	resp, err := s.Client.ExecuteRequest(data, "/mpesa/b2b/v1/paymentrequest")
+	resp, err := ExecuteB2BRequest(s.Config, s.Client, req)
 	if err != nil {
 		return nil, err
 	}
 
 	s.response = resp
 	return resp, nil
+}
+
+// ParseCallback parses a received callback payload using the shared ParseB2BCallback helper.
+func (s *BusinessBuyGoodsService) ParseCallback(payload map[string]any) (*B2BCallbackResult, error) {
+	return ParseB2BCallback(payload)
 }
 
 func (s *BusinessBuyGoodsService) getPartyA() string {
