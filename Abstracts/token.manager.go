@@ -1,6 +1,8 @@
 package Abstracts
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -49,13 +51,67 @@ type tokenResponse struct {
 //	cfg := createMpesaConfig()
 //	tokenManager := NewTokenManager(cfg)
 func NewTokenManager(cfg *MpesaConfig) *TokenManager {
-	return &TokenManager{
+	manager := &TokenManager{
 		ConsumerKey:    cfg.GetConsumerKey(),
 		ConsumerSecret: cfg.GetConsumerSecret(),
 		BaseURL:        cfg.GetBaseURL(),
 		TokenURL:       "/oauth/v1/generate?grant_type=client_credentials",
 		CachePath:      filepath.Join(os.TempDir(), "mpesa_api_token_cache.json"),
 	}
+	manager.CachePath = filepath.Join(os.TempDir(), manager.EncryptedCacheFileName())
+	return manager
+}
+
+// EncryptedCacheFileName encrypts the cache file name using AES-256-CBC encryption.
+// The encryption key is derived from the consumer key and consumer secret.
+// The encrypted file name is returned as a base64 encoded string.
+func (tm *TokenManager) EncryptedCacheFileName() string {
+	_ = "AES-256-CBC"                // for clarity
+	password := []byte("mypassword") // 32 bytes required for AES-256
+	iv := []byte("passwordpassword") // 16 bytes for AES block size
+	plaintext := []byte(tm.ConsumerKey + tm.ConsumerSecret + " + Certificate")
+
+	// Ensure key length is 32 bytes for AES-256
+	key := make([]byte, 32)
+	copy(key, password)
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		fmt.Println("Error creating cipher:", err)
+		return ""
+	}
+
+	// CBC mode requires plaintext to be padded to block size
+	padding := aes.BlockSize - len(plaintext)%aes.BlockSize
+	padtext := make([]byte, padding)
+	for i := range padtext {
+		padtext[i] = byte(padding)
+	}
+	plaintext = append(plaintext, padtext...)
+
+	ciphertext := make([]byte, len(plaintext))
+	mode := cipher.NewCBCEncrypter(block, iv)
+	mode.CryptBlocks(ciphertext, plaintext)
+
+	// Base64 encode the ciphertext and append ".json"
+	return base64.StdEncoding.EncodeToString(ciphertext) + ".json"
+}
+
+// SetCachePath sets the path for the token cache file.
+// This method allows customizing the location where the token cache is stored.
+//
+// Parameters:
+//   - path: The new path for the token cache file
+//
+// Returns:
+//   - *TokenManager: The token manager instance for method chaining
+//
+// Example:
+//
+//	tokenManager.SetCachePath("/path/to/custom/cache.json")
+func (tm *TokenManager) SetCachePath(path string) *TokenManager {
+	tm.CachePath = path
+	return tm
 }
 
 // GetToken returns a valid OAuth access token for API authentication.
