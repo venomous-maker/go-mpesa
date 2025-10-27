@@ -2,7 +2,9 @@ package Services
 
 import (
 	"errors"
+	"fmt"
 	"math"
+	"strconv"
 
 	abstracts "github.com/venomous-maker/go-mpesa/Abstracts"
 )
@@ -158,4 +160,211 @@ func (s *BusinessToPayBillService) getPartyA() string {
 // GetResponse returns the last API response stored by the service.
 func (s *BusinessToPayBillService) GetResponse() map[string]any {
 	return s.response
+}
+
+// B2PayBillCallbackResult represents a parsed B2PayBill callback payload.
+// It normalizes common fields and provides easy access to ResultParameters and ReferenceData.
+type B2PayBillCallbackResult struct {
+	ResultCode               string // numeric result code as string
+	ResultDesc               string // human readable description
+	TransactionID            string // M-Pesa transaction ID
+	OriginatorConversationID string
+	ConversationID           string
+	ResultParameters         map[string]string // key->value map from ResultParameters.ResultParameter
+	ReferenceData            map[string]string // key->value map from ReferenceData.ReferenceItem
+	Raw                      map[string]any    // original payload
+	Success                  bool              // true if ResultCode == 0
+}
+
+// ParseCallback parses a B2PayBill callback payload and returns a structured result.
+// The method tolerates variations in payload shapes (slices vs single objects) and
+// attempts to extract ResultCode, ResultDesc, TransactionID, ResultParameters and ReferenceData.
+func (s *BusinessToPayBillService) ParseCallback(payload map[string]any) (*B2PayBillCallbackResult, error) {
+	res := &B2PayBillCallbackResult{
+		ResultParameters: make(map[string]string),
+		ReferenceData:    make(map[string]string),
+		Raw:              payload,
+	}
+
+	// locate "Result" node (case-insensitive tolerant)
+	var resultNode any
+	if v, ok := payload["Result"]; ok {
+		resultNode = v
+	} else if v, ok := payload["result"]; ok {
+		resultNode = v
+	} else {
+		return nil, errors.New("payload missing Result node")
+	}
+
+	resultMap, ok := resultNode.(map[string]any)
+	if !ok {
+		// try map[string]interface{} conversion
+		if m2, ok2 := resultNode.(map[string]interface{}); ok2 {
+			resultMap = make(map[string]any)
+			for k, v := range m2 {
+				resultMap[k] = v
+			}
+		} else {
+			return nil, errors.New("Result node is not an object")
+		}
+	}
+
+	res.ResultCode = toString(resultMap["ResultCode"]) // may be string or number
+	res.ResultDesc = toString(resultMap["ResultDesc"])
+	res.TransactionID = toString(resultMap["TransactionID"])
+	res.OriginatorConversationID = toString(resultMap["OriginatorConversationID"])
+	res.ConversationID = toString(resultMap["ConversationID"])
+
+	// Parse ResultParameters -> ResultParameter (array or single)
+	if rpRaw, ok := resultMap["ResultParameters"]; ok {
+		switch rp := rpRaw.(type) {
+		case map[string]any:
+			parseResultParameterArray(rp["ResultParameter"], res.ResultParameters)
+		default:
+			parseResultParameterArray(rpRaw, res.ResultParameters)
+		}
+	}
+
+	// Parse ReferenceData -> ReferenceItem
+	if rdRaw, ok := resultMap["ReferenceData"]; ok {
+		switch rd := rdRaw.(type) {
+		case map[string]any:
+			parseReferenceItem(rd["ReferenceItem"], res.ReferenceData)
+		default:
+			parseReferenceItem(rdRaw, res.ReferenceData)
+		}
+	}
+
+	// determine success
+	if i, err := strconv.Atoi(res.ResultCode); err == nil {
+		res.Success = i == 0
+	} else {
+		res.Success = res.ResultCode == "0"
+	}
+
+	return res, nil
+}
+
+// helpers
+func toString(v any) string {
+	switch t := v.(type) {
+	case string:
+		return t
+	case float64:
+		// convert float to int string if it's integer-valued
+		if t == math.Trunc(t) {
+			return strconv.FormatInt(int64(t), 10)
+		}
+		return strconv.FormatFloat(t, 'f', -1, 64)
+	case int:
+		return strconv.Itoa(t)
+	case int64:
+		return strconv.FormatInt(t, 10)
+	case nil:
+		return ""
+	default:
+		return fmt.Sprint(t)
+	}
+}
+
+func parseResultParameterArray(input any, out map[string]string) {
+	if input == nil {
+		return
+	}
+
+	// handle slice
+	if arr, ok := input.([]any); ok {
+		for _, item := range arr {
+			if m, ok := item.(map[string]any); ok {
+				k := toString(m["Key"])
+				v := toString(m["Value"])
+				if k != "" {
+					out[k] = v
+				}
+			}
+		}
+		return
+	}
+
+	// handle []interface{}
+	if arr2, ok := input.([]interface{}); ok {
+		for _, item := range arr2 {
+			if m, ok := item.(map[string]interface{}); ok {
+				k := toString(m["Key"])
+				v := toString(m["Value"])
+				if k != "" {
+					out[k] = v
+				}
+			}
+		}
+		return
+	}
+
+	// single object
+	if m, ok := input.(map[string]any); ok {
+		k := toString(m["Key"])
+		v := toString(m["Value"])
+		if k != "" {
+			out[k] = v
+		}
+		return
+	}
+	if m2, ok := input.(map[string]interface{}); ok {
+		k := toString(m2["Key"])
+		v := toString(m2["Value"])
+		if k != "" {
+			out[k] = v
+		}
+		return
+	}
+}
+
+func parseReferenceItem(input any, out map[string]string) {
+	if input == nil {
+		return
+	}
+
+	if arr, ok := input.([]any); ok {
+		for _, item := range arr {
+			if m, ok := item.(map[string]any); ok {
+				k := toString(m["Key"])
+				v := toString(m["Value"])
+				if k != "" {
+					out[k] = v
+				}
+			}
+		}
+		return
+	}
+
+	if arr2, ok := input.([]interface{}); ok {
+		for _, item := range arr2 {
+			if m, ok := item.(map[string]interface{}); ok {
+				k := toString(m["Key"])
+				v := toString(m["Value"])
+				if k != "" {
+					out[k] = v
+				}
+			}
+		}
+		return
+	}
+
+	if m, ok := input.(map[string]any); ok {
+		k := toString(m["Key"])
+		v := toString(m["Value"])
+		if k != "" {
+			out[k] = v
+		}
+		return
+	}
+
+	if m2, ok := input.(map[string]interface{}); ok {
+		k := toString(m2["Key"])
+		v := toString(m2["Value"])
+		if k != "" {
+			out[k] = v
+		}
+		return
+	}
 }
