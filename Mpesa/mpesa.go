@@ -216,3 +216,29 @@ func (m *Mpesa) TransactionStatus() *Services.TransactionStatusService {
 func (m *Mpesa) Reversal() *Services.ReversalService {
 	return Services.NewReversalService(m.Config, m.Client)
 }
+
+// B2PayBill creates and returns a new Business-to-PayBill service instance.
+// This service allows a business to pay directly to a PayBill number or store on behalf of a consumer.
+//
+// Returns:
+//   - *Services.BusinessToPayBillService: A configured service for B2B PayBill payments
+//
+// Example:
+//
+//	b2paybillService := mpesa.B2PayBill()
+//	response, err := b2paybillService.
+//	    SetInitiator("testapi").
+//	    SetSecurityCredential("your_security_credential").
+//	    SetAmount(1000).
+//	    SetPartyA("174379").
+//	    SetPartyB("123456").
+//	    SetAccountReference("ABC123").
+//	    SetRequester("254711223344").
+//	    SetRemarks("Payment for goods").
+//	    SetOccasion("Payment").
+//	    SetQueueTimeoutURL("https://example.com/timeout").
+//	    SetResultURL("https://example.com/result").
+//	    Send()
+func (m *Mpesa) B2PayBill() *Services.BusinessToPayBillService {
+	return Services.NewBusinessToPayBillService(m.Config, m.Client)
+}
