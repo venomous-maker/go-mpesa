@@ -1,6 +1,6 @@
 # Go M-Pesa SDK
 
-A comprehensive Go SDK for integrating with Safaricom's M-Pesa API. This package provides a clean, type-safe interface for M-Pesa services including STK Push, B2C, C2B, Account Balance, Transaction Status, and Reversals.
+A comprehensive Go SDK for integrating with Safaricom's M-Pesa API. This package provides a clean, type-safe interface for M-Pesa services including STK Push, B2C, C2B, Account Balance, Transaction Status, Reversals, and B2B (BusinessPayBill & BusinessBuyGoods).
 
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://golang.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -12,6 +12,7 @@ A comprehensive Go SDK for integrating with Safaricom's M-Pesa API. This package
 - 🚀 **STK Push (Lipa na M-Pesa Online)** - Initiate payments from customer's phone
 - 💸 **B2C (Business to Customer)** - Send money to customers
 - 💰 **C2B (Customer to Business)** - Receive payments from customers
+- 🏦 **B2B (Business to Business)** - BusinessPayBill and BusinessBuyGoods to pay paybills, tills, merchant stores and HO
 - 📊 **Account Balance** - Check account balance
 - 🔍 **Transaction Status** - Query transaction status
 - ↩️ **Reversal** - Reverse transactions
