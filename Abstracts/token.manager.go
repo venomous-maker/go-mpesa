@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -22,6 +23,9 @@ type TokenManager struct {
 	BaseURL        string // Base URL for M-Pesa API
 	TokenURL       string // OAuth token endpoint path
 	CachePath      string // File path for token cache storage
+
+	mu       sync.Mutex  // protects memCache + file operations
+	memCache *tokenCache // in-memory cache to avoid frequent FS reads / duplicate requests
 }
 
 // tokenCache represents the structure for storing cached tokens.
@@ -62,13 +66,11 @@ func NewTokenManager(cfg *MpesaConfig) *TokenManager {
 	return manager
 }
 
-// EncryptedCacheFileName encrypts the cache file name using AES-256-CBC encryption.
-// The encryption key is derived from the consumer key and consumer secret.
-// The encrypted file name is returned as a base64 encoded string.
+// EncryptedCacheFileName (unchanged) ...
 func (tm *TokenManager) EncryptedCacheFileName() string {
-	_ = "AES-256-CBC"                // for clarity
-	password := []byte("mypassword") // 32 bytes required for AES-256
-	iv := []byte("passwordpassword") // 16 bytes for AES block size
+	_ = "AES-256-CBC"
+	password := []byte("mypassword")
+	iv := []byte("passwordpassword")
 	plaintext := []byte(tm.ConsumerKey + tm.ConsumerSecret + " + Certificate")
 
 	// Ensure key length is 32 bytes for AES-256
@@ -114,27 +116,23 @@ func (tm *TokenManager) SetCachePath(path string) *TokenManager {
 	return tm
 }
 
-// GetToken returns a valid OAuth access token for API authentication.
-// This method first checks for a valid cached token and returns it if available.
-// If no valid cached token exists, it requests a new token from the M-Pesa OAuth endpoint.
-//
-// Returns:
-//   - string: A valid OAuth access token
-//   - error: An error if token acquisition fails
-//
-// Example:
-//
-//	token, err := tokenManager.GetToken()
-//	if err != nil {
-//	    log.Printf("Failed to get token: %v", err)
-//	    return
-//	}
-//	// Use token for API requests
+// GetToken returns a valid OAuth access token. Uses in-memory cache first and
+// falls back to file cache. Serializes requests to avoid duplicate token calls.
 func (tm *TokenManager) GetToken() (string, error) {
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
+
+	// check in-memory cache
+	if tm.memCache != nil && time.Now().Unix() < tm.memCache.ExpiresAt {
+		return tm.memCache.Token, nil
+	}
+
+	// try file cache (and populate in-memory if valid)
 	if token := tm.getCachedToken(); token != "" {
 		return token, nil
 	}
 
+	// no valid cache -> request new token (protected by mutex to avoid duplicate requests)
 	token, err := tm.requestNewToken()
 	if err != nil {
 		return "", err
@@ -143,7 +141,7 @@ func (tm *TokenManager) GetToken() (string, error) {
 	return token, nil
 }
 
-// getCachedToken reads and checks the cached token for validity
+// getCachedToken reads and checks the cached token for validity and populates in-memory cache.
 func (tm *TokenManager) getCachedToken() string {
 	data, err := os.ReadFile(tm.CachePath)
 	if err != nil {
@@ -159,6 +157,8 @@ func (tm *TokenManager) getCachedToken() string {
 		return ""
 	}
 
+	// valid -> set in-memory cache
+	tm.memCache = &cached
 	return cached.Token
 }
 
@@ -201,17 +201,39 @@ func (tm *TokenManager) requestNewToken() (string, error) {
 
 	expiresInInt, err := strconv.ParseInt(tokenResp.ExpiresIn, 10, 64)
 	if err != nil {
-		return "", fmt.Errorf("invalid expires_in value: %w", err)
+		// try to be tolerant: if parse fails, default to 300 seconds
+		fmt.Println("warning: invalid expires_in, defaulting to 300s:", err)
+		expiresInInt = 300
 	}
 
-	// Subtract buffer (60 seconds)
-	expiresIn := expiresInInt - 60
-	tm.cacheToken(tokenResp.AccessToken, time.Now().Unix()+expiresIn)
+	// safe buffer handling: only subtract buffer when expires_in is larger than buffer
+	var effectiveExpires int64
+	const buffer = int64(60)
+	if expiresInInt > buffer {
+		effectiveExpires = expiresInInt - buffer
+	} else {
+		// avoid negative expiry; use half of the returned TTL or at least 1 second
+		if expiresInInt > 1 {
+			effectiveExpires = expiresInInt / 2
+		} else {
+			effectiveExpires = 1
+		}
+	}
+
+	expiresAt := time.Now().Unix() + effectiveExpires
+
+	// update memory cache first then persist
+	tm.memCache = &tokenCache{
+		Token:     tokenResp.AccessToken,
+		ExpiresAt: expiresAt,
+		CreatedAt: time.Now().Unix(),
+	}
+	tm.cacheToken(tokenResp.AccessToken, expiresAt)
 
 	return tokenResp.AccessToken, nil
 }
 
-// cacheToken writes token details to file
+// cacheToken writes token details to file atomically and logs errors
 func (tm *TokenManager) cacheToken(token string, expiresAt int64) {
 	cache := tokenCache{
 		Token:     token,
@@ -220,11 +242,37 @@ func (tm *TokenManager) cacheToken(token string, expiresAt int64) {
 	}
 
 	data, _ := json.Marshal(cache)
-	_ = os.WriteFile(tm.CachePath, data, 0600)
+
+	// atomic write: write to temp file in same dir then rename
+	dir := filepath.Dir(tm.CachePath)
+	tmpf, err := os.CreateTemp(dir, "mpesa-token-*.tmp")
+	if err != nil {
+		fmt.Println("failed to create temp file for token cache:", err)
+		// try non-atomic fallback
+		_ = os.WriteFile(tm.CachePath, data, os.ModePerm)
+		return
+	}
+	_, err = tmpf.Write(data)
+	tmpf.Close()
+	if err != nil {
+		fmt.Println("failed writing token cache temp file:", err)
+		_ = os.Remove(tmpf.Name())
+		_ = os.WriteFile(tm.CachePath, data, os.ModePerm)
+		return
+	}
+	_ = os.Chmod(tmpf.Name(), os.ModePerm)
+	if err := os.Rename(tmpf.Name(), tm.CachePath); err != nil {
+		fmt.Println("failed to rename token cache temp file:", err)
+		// fallback
+		_ = os.WriteFile(tm.CachePath, data, os.ModePerm)
+	}
 }
 
-// ClearCache deletes the token cache file
+// ClearCache deletes the token cache file and resets in-memory cache
 func (tm *TokenManager) ClearCache() {
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
+	tm.memCache = nil
 	if _, err := os.Stat(tm.CachePath); err == nil {
 		_ = os.Remove(tm.CachePath)
 	}
