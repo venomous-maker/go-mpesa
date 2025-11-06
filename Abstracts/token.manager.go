@@ -245,6 +245,11 @@ func (tm *TokenManager) cacheToken(token string, expiresAt int64) {
 
 	// atomic write: write to temp file in same dir then rename
 	dir := filepath.Dir(tm.CachePath)
+	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+		fmt.Println("failed to create token cache dir:", err)
+		_ = os.WriteFile(tm.CachePath, data, os.ModePerm)
+		return
+	}
 	tmpf, err := os.CreateTemp(dir, "mpesa-token-*.tmp")
 	if err != nil {
 		fmt.Println("failed to create temp file for token cache:", err)
