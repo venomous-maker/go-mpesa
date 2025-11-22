@@ -276,6 +276,10 @@ func (cfg *MpesaConfig) SetSecurityCredential(initiatorPassword string) error {
 	return nil
 }
 
+func (cfg *MpesaConfig) OverrideSecurityCredential(credential string) {
+	cfg.securityCredential = credential
+}
+
 // Helper function to return dereferenced pointer or default
 func getOrDefault(val *string, fallback string) string {
 	if val != nil {
