@@ -209,10 +209,16 @@ func (m *Mpesa) TransactionStatus() *Services.TransactionStatusService {
 //
 //	reversalService := mpesa.Reversal()
 //	response, err := reversalService.
-//	    SetTransactionID("ABC123XYZ").
-//	    SetAmount(1000).
-//	    SetCommandID("TransactionReversal").
+//	    SetInitiator("apiuser").
+//	    SetTransactionID("PDU91HIVIT").
+//	    SetAmount(200).
+//	    SetReceiverIdentifierType("11").
+//	    SetRemarks("Payment reversal").
 //	    Reverse()
+//	if err != nil {
+//	    // handle error
+//	}
+//	// use response
 func (m *Mpesa) Reversal() *Services.ReversalService {
 	return Services.NewReversalService(m.Config, m.Client)
 }
