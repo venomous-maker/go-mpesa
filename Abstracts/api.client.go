@@ -116,6 +116,7 @@ func (client *ApiClient) sendRequest(payload any, endpoint, token string, isRetr
 
 	var response map[string]any
 	if err := json.Unmarshal(body, &response); err != nil {
+		fmt.Println(string(body))
 		return nil, fmt.Errorf("response decode error: %w", err)
 	}
 
