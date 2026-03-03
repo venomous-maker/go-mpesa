@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 // ApiClient handles HTTP communication with M-Pesa API endpoints.
@@ -97,7 +98,19 @@ func (client *ApiClient) sendRequest(payload any, endpoint, token string, isRetr
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	resp, err := http.DefaultClient.Do(req)
+	transport := &http.Transport{
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: 15 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		ForceAttemptHTTP2:     false, // 🔥 Important
+	}
+
+	clientHTTP := &http.Client{
+		Timeout:   30 * time.Second,
+		Transport: transport,
+	}
+
+	resp, err := clientHTTP.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("request error: %w", err)
 	}
